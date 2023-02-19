@@ -1,0 +1,391 @@
+// ==UserScript==
+// @name         FlagOverflow (Get flag rank)
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Flag Overflow
+// @author       Shree: https://stackoverflow.com/users/965146/shree
+// @match        *://*.chat.stackoverflow.com/rooms/167908/*
+// @match        *://*.chat.stackoverflow.com/rooms/111347/*
+// @grant        GM_xmlhttpRequest
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    readChatMessage();
+})();
+
+function sendChatMessage(msg, Room_ID) {
+    
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: 'https://chat.stackoverflow.com/rooms/' + Room_ID,
+        onload: function(response) {
+            var fkey = response.responseText.match(/hidden" value="([\dabcdef]{32})/)[1];
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: 'https://chat.stackoverflow.com/chats/' + Room_ID + '/messages/new',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                data: 'text=' + encodeURIComponent(msg.replaceAll("&#39;","\'")
+                                                   .replaceAll("&quot;","\"")
+                                                   .trim()) + "&fkey=" + fkey,
+                onload: function(r) {
+
+                }
+            });
+        }
+    });
+}
+
+// Function based upon this SO answer :  https://stackoverflow.com/a/40449006/965146
+function timeDifference1(t) {
+    var a = new Date(t * 1000);
+    var today = new Date();
+    var yesterday = new Date(Date.now() - 86400000);
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var year = a.getFullYear();
+    var month = months[a.getMonth()];
+    var date = a.getDate();
+    var hour = a.getHours();
+    var min = a.getMinutes();
+    if (a.setHours(0,0,0,0) == today.setHours(0,0,0,0))
+        return 'today, ' + hour + ':' + min;
+    else if (a.setHours(0,0,0,0) == yesterday.setHours(0,0,0,0))
+        return 'yesterday, ' + hour + ':' + min;
+    else if (year == today.getFullYear())
+        return date + ' ' + month + ', ' + hour + ':' + min;
+    else
+        return date + ' ' + month + ' ' + year + ', ' + hour + ':' + min;
+}
+function timeDifference(activeTime){
+    var current = new Date();
+    var msPerMinute = 60 * 1000;
+    var msPerHour = msPerMinute * 60;
+    var msPerDay = msPerHour * 24;
+    var msPerMonth = msPerDay * 30;
+    var msPerYear = msPerDay * 365;
+
+    var elapsed = current - activeTime;
+
+    if (elapsed < msPerMinute) {
+        return Math.round(elapsed / 1000) + ' seconds ago';
+    } else if (elapsed < msPerHour) {
+        return Math.round(elapsed / msPerMinute) + ' minutes ago';
+    } else if (elapsed < msPerDay) {
+        return Math.round(elapsed / msPerHour) + ' hours ago';
+    } else if (elapsed < msPerMonth) {
+        return 'approximately ' + Math.round(elapsed / msPerDay) + ' days ago';
+    } else if (elapsed < msPerYear) {
+        return 'approximately ' + Math.round(elapsed / msPerMonth) + ' months ago';
+    } else {
+        return 'approximately ' + Math.round(elapsed / msPerYear) + ' years ago';
+    }
+}
+
+function readChatMessage(){
+
+
+    readcmd();
+    async function readcmd(){
+        var getquote=[];
+        let botName='@sBot';
+        //let Room_ID = '167908'; // Work Shop
+        let Room_ID = '111347'; // /sobotics
+        //let Room_ID = '232981'; // /My room
+
+        let rqt = '';
+        let quotes = await getquot();
+
+        var rn = 1;
+        getquote = quotes.map(a => a.q + ' #@# ' + a.a);
+
+        let cmd = [
+            'help, commands  =>  Returns all available commands'
+            ,'alive  =>  Return status'
+            ,'talk, quote  =>  Return random quote'
+            ,'hello , hi , morning, evening   =>  Greetings'
+            , 'csm , rank OR rank <userid> / csm <userid> =>  Return total helpful flag'
+            , 'why  => ?'
+            , 'shrug  =>  ...'
+            , 'tableflip , flip  => ping pong'
+            , 'unflip  =>  pong ping'
+            ,'welcome <username>  =>  Return welcome message for new user with room information '
+            , 'tea , coffee  => ☕'
+            , 'RO  =>  Return list of  RO present in the room '
+            , 'blame => Blame random person who present in the room'
+        ];
+
+        let roomOwnersID = [
+            "965146", "7733418", "6296561",
+            "1839439", "4099593", "559745",
+            "5292302", "563532", "3002139",
+            "10607772", "4687348", "6375113",
+            "578411", "3476191", "4733879",
+            "3160466", "5148907", "4688119",
+            "2246344", "4137985", "4174897",
+            "4050842", "2415822", "1743880",
+            "1816093"
+        ]
+        
+
+        let regularsID=[
+            '7733418'
+        ]
+
+
+        $("body").on("DOMNodeInserted", function(event) {
+            let user='';
+            let userURL='';
+            let message = '';
+            let messageId='';
+            let userID='';
+            let isCommand = false;
+
+            if($(event.target).hasClass("message") && $(event.target).hasClass("neworedit")) {
+                let signature = $(event.target).parent().siblings(".signature");
+                userURL = signature.attr('href');
+                user = signature.children(".username").text().trim();
+                message = $(event.target).children(".content").text();
+                messageId = $(event.target).attr("id").split("-")[1];
+                //isCommand = (message.split(' ').length <= 3 ? true : false);
+                userID = userURL.split('/')[2];
+                isCommand = true;
+            }
+
+            let msgUser = '@' + user + '  ';
+            let drink = 'brew a ☕ of ';
+
+            if(message!='' && message.startsWith(botName) && isCommand){
+                let commandCase = message.split(' ')[1].toLowerCase();
+                switch (commandCase) {
+                    case 'alive':
+                        sendChatMessage(msgUser + '  Ahaaa!!! lurking 🏃', Room_ID)
+                        break;
+                    case 'tea':
+                        var tfor = message.split(' ')[2];
+                        var teaA = ['Green', 'Oolong', 'Black', 'Darjeeling', 'Iced', 'Blends', 'Pu-erh', 'Matcha', 'Herbal', 'Rooibos'];
+                        var rnt = teaA[Math.floor(Math.random() * teaA.length)];
+                        if (typeof(tfor) == 'undefined') {
+                            sendChatMessage(msgUser + drink + rnt + ' tea for ' + msgUser, Room_ID);
+                        }
+                        else{
+                            sendChatMessage(msgUser + drink + rnt + ' tea for ' + '@' + tfor, Room_ID);
+                        }
+                        break;
+                    case 'coffee':
+                        var cfor = message.split(' ')[2];
+                        var coffeeA = ['Espresso', 'Double Espresso', 'Red Eye', 'Black Eye', 'Americano', 'Long Black', 'Macchiato', 'Cortado', 'Breve', 'Cappuccino', 'Cafe Latte', 'Mocha', 'Vienna', 'Affogato', 'Cafe au Lait', 'Iced Coffee'];
+                        var rnc = coffeeA[Math.floor(Math.random() * coffeeA.length)];
+                        if (typeof(cfor) == 'undefined') {
+                            sendChatMessage(msgUser + drink + rnc + ' coffee for ' + msgUser, Room_ID);
+                        }
+                        else{
+                            sendChatMessage(msgUser + drink + rnc + ' coffee for ' + '@' + cfor, Room_ID);
+                        }
+                        break;
+                    case 'quote':
+                    case 'talk':
+                        var rnd = Math.floor(Math.random() * 50) + 1;
+                        rqt = getquote[rnd];
+                        rqt = '**❝ '+ rqt.split(' #@# ')[0].trim() +' ❞** *:- ' + rqt.split(' #@# ')[1].trim()+ '*'
+                        sendChatMessage(msgUser + rqt , Room_ID)
+                        break;
+                    case 'hello':
+                    case 'hi':
+                    case 'morning':
+                    case 'evening':
+                        sendChatMessage(msgUser + '🙏🏽 ' + message.split(' ')[1], Room_ID)
+                        break;
+                    case 'help':
+                    case 'commands':
+                        sendChatMessage(msgUser + ' ### List of commands: ### \n' + cmd.join('\n ') , Room_ID)
+                        break;
+                    case 'ro':
+                        var msg = '';
+                        var count = 0;
+                        var aro=[];
+                        $("#present-users > .present-user").each(function(index) {
+
+                            var uID = $(this).attr('id').split('-')[2];
+                            var isRO = roomOwnersID.includes(uID);
+                            if (isRO) {
+                                var uName = $(this).find('.avatar > img').attr('title');
+                                var aTime = $(this).find('.last-activity-time').text();
+                                //aTime = timeDifference(new Date(aTime * 1000));
+                                aTime = timeDifference1(aTime);
+                                aro.push(uName + ' (last activity: ' + aTime + ')');
+                                count++
+                            }
+                        });
+                        sendChatMessage('There are currently ' + count + ' RO in this room. \n' + aro.join('\n') , Room_ID);
+                        break;
+                    case 'csm':
+                    case 'rank':
+
+                        var rusr = message.split(' ')[2];
+                        var userId = typeof(rusr) == 'undefined'  ? userID : rusr;
+                        var find = 'Total number of raised flags marked useful';
+                        var URL='https://stackoverflow.com/users/'+ userId + '?tab=topactivity';
+
+                        var userRep = async function getrep(){
+                            return new Promise(resolve => {
+                                GM_xmlhttpRequest({
+                                    method: 'GET',
+                                    url:URL,
+                                    onload: function(data) {
+                                        resolve(data.responseText);
+                                        console.log(data.responseText);
+                                    }
+                                });
+                            });
+
+                        }
+                        userRep()
+                            .then(function(result) {
+                            var $result = $(result).find("span[title='"+ find + "']").find("div").eq(0).text();
+                            //alert(typeof($result));
+                            var tUser = '';
+                            if(typeof(rusr) != 'undefined')
+                                tUser = $(result).find(".fs-headline2").eq(0).text().trim();
+                            getRank(msgUser,$result, Room_ID,tUser)
+                        });
+
+                        break;
+                    case "blame":
+
+                        var rndl = Math.floor(Math.random() * $('#present-users > .present-user').length );
+                        var rndli = $('#present-users > .present-user').get(rndl);
+                        var blame = $(rndli).find('.avatar > img').attr('title');
+                        sendChatMessage(msgUser + 'It\'s (☞ ͡ ° ͜ʖ ͡°)☞ ' + blame + '\'s fault.' , Room_ID);
+
+                        break;
+                    case "why":
+                        sendChatMessage(msgUser + '[42](https://en.wikipedia.org/wiki/Phrases_from_The_Hitchhiker%27s_Guide_to_the_Galaxy#Answer_to_the_Ultimate_Question_of_Life,_the_Universe,_and_Everything_(42))', Room_ID);
+                        break;
+                    case "shrug":
+                        sendChatMessage('\u00AF\\ \\_(\u30C4)\\_ /\u00AF', Room_ID);
+                        break;
+                    case "tableflip":
+                    case "flip":
+                        sendChatMessage('(\u256F\u00B0\u25A1\u00B0\uFF09\u256F\uFE35 \u253B\u2501\u253B', Room_ID);
+                        break;
+                    case "unflip":
+                        sendChatMessage('\u252C\u2500\u252C \u30CE( \u309C-\u309C\u30CE)', Room_ID);
+                        break;
+                    case "welcome":
+                        var roomModerator =roomOwnersID.concat(regularsID);
+                        var wusr = message.split(' ')[2]
+                        var cf = roomModerator.includes(userID);
+                        if (cf){
+                            if (typeof(wusr) == 'undefined') {
+                                sendChatMessage('Err!!! unable to find new user. \n ### List of commands: ### \n' + cmd.join('\n ') , Room_ID)
+                            }
+                            else {
+                                sendChatMessage('@'+ wusr +' Welcome to SOBotics! This room is dedicated to moderating content on Stack Overflow with the use of bots. If you\'d like to help out with flagging, reporting, or anything else, let us know! We have some helpful userscripts to make things easier, and you\'ll always find someone around who will help you to install them and explain how they work.', Room_ID)
+                                setTimeout(function(){
+                                    sendChatMessage('Also make sure to check out our [GitHub](https://github.com/sobotics), [All bots](https://sobotics.org/all-bots/), [UserScripts](https://sobotics.org/userscripts).',Room_ID)
+                                },5000);
+                            }
+                        }
+                        else{
+                            sendChatMessage('You are not privileged user to run this command.  cc @Shree', Room_ID);
+                        }
+                        break;
+                    default:
+                        //sendChatMessage(msgUser + 'Nobody Wins! !! !!! \n ### List of commands: ### \n' + cmd.join('\n '), Room_ID)
+                        //sendChatMessage(msgUser + '🙂', Room_ID)
+                        break;
+                }
+
+            }
+        });
+
+    }
+
+}
+function getRank(msgUser, result, Room_ID,tUser){
+
+    let flagRank = [
+        [365, 'A flag a day keeps bad posts away', 'One year has 365 days'],
+        [811, 'How thare thy?', 'I think you know whose user id that is'],
+        [1111, 'No badge needed', 'A number is prettier than a badge anyway!'],
+        [1337, 'l337 fl4663r', '[l337 5p34k 15 4w350m3!](https://en.wikipedia.org/wiki/Leet)'],
+        [1618, 'The Golden Ratio: Phi, 1.618', 'PHI is considered the most beautiful number in the universe'],
+        [1969, 'Moon landing', 'I flagged the moon!'],
+        [2008, 'Flag Overflow', 'Stack Overflow was created in 2008'],
+        [2395, 'Flag me up, Scotty', '[We don\'t beam, we flag](https://en.wikipedia.org/wiki/Beam_me_up,_Scotty)'],
+        [3456, '<3456', 'You <3 flagging too much'],
+        [5566, '[Long Time No Flag](https://en.wikipedia.org/wiki/Long_Time_No_See_(5566_album))', '[Taiwanese boy band, formed under Taiwanese music company, J-Star](https://en.wikipedia.org/wiki/5566)'],
+        [10000, 'Elite Squad', '[At one point of time, there were only 16 of us](https://chat.meta.stackexchange.com/transcript/message/6083409#6083409)'],
+        [19679, 'Professional Larnsonist', '19679 is Brad Larnson\'s user id'],
+        [22656, 'Almost Jon Skeet', '22656 is his (John\'s) user ID'],
+        [33333, 'The Mad Flagger', 'Got nothing better to do with your time? ;D'],
+        [42195, 'The Marathon', 'Marathon\'s length in meters'],
+        [56492, 'DCAC', '[Thunderstuck in reverse](https://www.youtube.com/watch?v=v2AC41dglnM)' ],
+        [65536, 'Sweet 16', '[Don\'t let a short stop you](https://stackoverflow.com/a/44829406/965146)'],
+        [70606, 'Gogol', '[Back on Texas Instruments :)](http://blog.presentandcorrect.com/250-words-you-can-spell-with-a-calculator)'],
+        [78910, 'Hurray', 'Count to 10 and blow out the candles'],
+        [88888, 'Infinity', 'To infinity and beyond'],
+        [100000,'Heart OverFlow', 'The human 💓 beats over 100,000 times a day' ],
+        [101010, "Definitely a robot", "42 in binary code. [Also 42 is the Answer to the Ultimate Question of Life, the Universe, and Everything](https://en.wikipedia.org/wiki/Phrases_from_The_Hitchhiker%27s_Guide_to_the_Galaxy#Answer_to_the_Ultimate_Question_of_Life,_the_Universe,_and_Everything_(42))"],
+        [110560, 'Cosmological', '[Is it there or is it not?](https://en.wikipedia.org/wiki/Cosmological_constant)'],
+        [111347, 'SOBotics', 'You\'re in the right room. \'leave\' is now disabled'],
+        [123456, 'Straight flush', '[You can\'t win if you don\'t play :)](https://en.wikipedia.org/wiki/List_of_poker_hands)'],
+        [127001, 'Localhost', 'Home sweet home'],
+        [131072, 'Overflow', 'Expand now or go back to 65536'],
+        [150051, 'Symmetry', '[Mirror on the wall](https://en.wikipedia.org/wiki/Magic_Mirror_(Snow_White))'],
+        [160663, 'In your prime', '[6 more to reach your next](https://primenumberslist.com/6-digits-prime-numbers?page=35)'],
+        [174762, 'Nine 10s', '101010101010101010'],
+        [181818, 'Angles sing', 'There\'s no such thing as too much'],
+        [185200, 'Nautical mile', '[Count your flags like your centimeters](https://duckduckgo.com/?q=conversion+nautical+mile&ia=answer)'],
+        [196907, 'Touch down', '[Looking at the world from above](https://en.wikipedia.org/wiki/Moon_landing)'],
+        [200769, 'Apollo 11', '[It happened!](https://en.wikipedia.org/wiki/Apollo_11)'],
+        [314159, '\u03C0', 'Who ate all the Pi?'],
+        [874188, 'tripleee', 'Wheeereee has theee eee goneee?'],
+        [4294967296, 'A **long** journey', '..........']
+    ]
+
+    var getRank = [];
+    var $result = result;
+    var goal = $result.trim().split(' ')[0].replace(/,/g, '');
+    $.each(flagRank, function(index, item) {
+        getRank.push(flagRank[index][0])
+    });
+
+    var closest = null;
+    var rankInd = null;
+
+    $.each(getRank, function(index, item) {
+        if (closest == null || Math.abs(this - goal) < Math.abs(closest - goal)) {
+            closest = this;
+            rankInd = index;
+        }
+    });
+
+    var diff = flagRank[rankInd + 1][0] - goal;
+    var targetUser = tUser == '' ? 'You' : tUser;
+
+    var msg = targetUser +' currently have ' + $result + ' helpful flags. Last achieved rank was **' + flagRank[rankInd][1] + '** ' + flagRank[rankInd][2] + '. Need ' + diff + ' more flags for next rank, **' + flagRank[rankInd + 1][1] + '** .'
+    sendChatMessage(msgUser + msg.replace(/\n|\r/g, " "), Room_ID)
+
+}
+
+function getquot() {
+    return new Promise(resolve => {
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: 'https://zenquotes.io/api/quotes',
+            onload: function(data) {
+                resolve(JSON.parse(data.responseText));
+            }
+        });
+    });
+}
+async function getquotes(){
+
+    let getquote=[];
+    let quotes = await getquot();
+    getquote = quotes.map(a => a.q + ' #@# ' + a.a);
+    return(getquote);
+}
